@@ -1,5 +1,7 @@
 package main
 
+
+
 import (
 	"encoding/json"
 	"fmt"
@@ -42,28 +44,47 @@ func main() {
 	fmt.Printf(" 2v2: http://localhost:%s/2s/NICK\n", config.Port)
 	fmt.Printf(" 3v3: http://localhost:%s/3s/NICK\n\n (W nicku musisz dać nazwę z Epic Games.)\n\n", config.Port)
 
-	http.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
-		p := strings.Split(r.URL.Path, "/")
-		if len(p) < 3 { return }
-		nick := p[2]
-		
-		logRequest("Request API", nick)
+http.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
+        p := strings.Split(r.URL.Path, "/")
+        if len(p) < 3 { return }
+        nick := p[2]
+        
+        logRequest("Request API", nick)
 
-		c := &http.Client{Timeout: 10 * time.Second}
-		req, _ := http.NewRequest("GET", "https://api.tracker.gg/api/v2/rocket-league/standard/profile/epic/"+nick, nil)
-		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-		
-		res, err := c.Do(req)
-		if err != nil {
-			logRequest("Error", err.Error())
-			return
-		}
-		defer res.Body.Close()
+        c := &http.Client{Timeout: 15 * time.Second}
+        apiURL := "https://api.tracker.gg/api/v2/rocket-league/standard/profile/epic/" + nick
+        
+        req, _ := http.NewRequest("GET", apiURL, nil)
+        
+        req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:149.0) Gecko/20100101 Firefox/149.0")
+        req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+        req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+        req.Header.Set("Sec-GPC", "1")
+        req.Header.Set("Alt-Used", "api.tracker.gg")
+        req.Header.Set("Upgrade-Insecure-Requests", "1")
+        req.Header.Set("Sec-Fetch-Dest", "document")
+        req.Header.Set("Sec-Fetch-Mode", "navigate")
+        req.Header.Set("Sec-Fetch-Site", "none")
+        req.Header.Set("Sec-Fetch-User", "?1")
+        req.Header.Set("Priority", "u=0, i")
+        
+        res, err := c.Do(req)
+        if err != nil {
+            logRequest("Error", err.Error())
+            return
+        }
+        defer res.Body.Close()
 
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Content-Type", "application/json")
-		io.Copy(w, res.Body)
-	})
+        if res.StatusCode != 200 {
+            logRequest("API STATUS", fmt.Sprintf("%d", res.StatusCode))
+        }
+
+        w.Header().Set("Access-Control-Allow-Origin", "*")
+        w.Header().Set("Content-Type", "application/json")
+        
+        // Kopiujemy odpowiedź prosto do przeglądarki/OBSa
+        io.Copy(w, res.Body)
+    })
 
 	http.HandleFunc("/img/", func(w http.ResponseWriter, r *http.Request) {
 		f := strings.TrimPrefix(r.URL.Path, "/img/")

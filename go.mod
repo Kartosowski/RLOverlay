@@ -1,4 +1,4 @@
-module rank-rl-kartos
+module RankRLOverlay
 
 go 1.25.7
 
