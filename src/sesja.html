@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html lang="pl">
+
 <head>
     <meta charset="UTF-8">
     <title>RL Live Session Tracker</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700;800&display=swap');
 
         body {
             background-color: transparent;
@@ -14,106 +15,155 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
-            color: white;
+            color: #ffffff;
             overflow: hidden;
         }
 
         .overlay {
-            background: linear-gradient(180deg, #121212 0%, #050505 100%);
-            border: 2px solid #2a2a2a;
-            padding: 15px 35px;
+            background: linear-gradient(145deg, rgba(20, 20, 20, 0.9), rgba(10, 10, 10, 0.95));
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 15px 45px 25px 45px;
             display: flex;
-            gap: 40px;
-            border-radius: 4px;
+            gap: 50px;
             position: relative;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.8);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
         }
 
-        .overlay::after {
+        .overlay::before {
             content: "";
             position: absolute;
-            top: -2px; left: 0; right: 0;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
             height: 3px;
-            background: linear-gradient(90deg, transparent, #ffd700, transparent);
+            border-radius: 3px 3px 0 0;
+            opacity: 0.8;
         }
 
         .stat-item {
             text-align: center;
-            min-width: 80px;
+            min-width: 90px;
             display: flex;
             flex-direction: column;
             justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .stat-item:nth-child(1)::after,
+        .stat-item:nth-child(2)::after {
+            content: "";
+            position: absolute;
+            right: -25px;
+            top: 20%;
+            height: 60%;
+            width: 1px;
+            background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.2), transparent);
         }
 
         .label {
-            font-size: 14px;
+            font-size: 16px;
             text-transform: uppercase;
-            color: #aaa;
-            margin-bottom: -5px;
-            font-weight: 600;
-        }
-
-        .value {
-            font-size: 48px;
+            color: #dcdcdc;
+            margin-bottom: 2px;
             font-weight: 700;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-            line-height: 1;
+            letter-spacing: 0.15em;
         }
 
+        .value,
         .delta-value {
-            font-size: 52px;
+            font-size: 46px;
             font-weight: 800;
+            line-height: 1;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
         }
 
-        .plus { color: #2ecc71; }
-        .minus { color: #e74c3c; }
-        .neutral { color: #777; }
+        .plus {
+            color: #00ff88;
+        }
 
-        .wins .value { color: #2ecc71; }
-        .losses .value { color: #e74c3c; }
+        .minus {
+            color: #ff3366;
+        }
+
+        .neutral {
+            color: #aaaaaa;
+        }
+
+        .wins .value {
+            color: #00ff88;
+        }
+
+        .losses .value {
+            color: #ff3366;
+        }
 
         .streak-info {
             position: absolute;
-            bottom: -22px;
+            bottom: -20px;
             left: 50%;
             transform: translateX(-50%);
-            background: #1a1a1a;
-            padding: 2px 15px;
-            border: 1px solid #2a2a2a;
-            font-size: 14px;
-            color: #ffd700;
+            background: rgba(15, 15, 15, 0.95);
+            padding: 6px 24px;
+            border-radius: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            font-size: 18px;
             white-space: nowrap;
-            font-weight: 700;
+            font-weight: 800;
             text-transform: uppercase;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            letter-spacing: 0.08em;
+            backdrop-filter: blur(5px);
+        }
+
+        .streak {
+            color: #ffffff;
+        }
+
+        #win-streak::after {
+            content: " Streak";
+            color: inherit;
         }
     </style>
 </head>
-<body>
 
+<body>
     <div class="overlay">
         <div class="stat-item wins">
-            <div class="label">Wins</div>
+            <div class="label">Wygrane</div>
             <div id="session-wins" class="value">0</div>
         </div>
 
         <div class="stat-item">
+            <div class="label">MMR</div>
             <div id="mmr-delta" class="delta-value neutral">0</div>
         </div>
 
         <div class="stat-item losses">
-            <div class="label">Losses</div>
+            <div class="label">Przegrane</div>
             <div id="session-losses" class="value">0</div>
         </div>
 
         <div class="streak-info">
-            <span id="streak-display">0 STREAK</span>
+            <span id="win-streak">0</span>
         </div>
     </div>
 
     <script>
-        const pathParts = window.location.pathname.split('/');
-        const modeUrl = pathParts[2]; 
-        const NICK = pathParts[3];
+        const p = window.location.pathname.split('/');
+        const mode = p[2];
+        const nick = p[3];
+
+        const trackerModes = {
+            "1s": "1v1",
+            "2s": "2v2",
+            "3s": "3v3"
+        };
 
         const modeMapping = {
             "1s": "Ranked Duel 1v1",
@@ -121,16 +171,75 @@
             "3s": "Ranked Standard 3v3"
         };
 
-        const currentModeName = modeMapping[modeUrl] || modeMapping["3s"];
+        function getRankData(rankName) {
+            const r = rankName.toLowerCase();
+            let img = "unranked.png";
 
-        async function updateStats() {
+            if (r.includes("supersonic")) { img = "ssl.png"; }
+            else if (r.includes("grand champion")) {
+                if (r.includes("iii")) img = "gc3.png";
+                else if (r.includes("ii")) img = "gc2.png";
+                else img = "gc1.png";
+            } else if (r.includes("champion")) {
+                if (r.includes("iii")) img = "c3.png";
+                else if (r.includes("ii")) img = "c2.png";
+                else img = "c1.png";
+            } else if (r.includes("diamond")) {
+                if (r.includes("iii")) img = "d3.png";
+                else if (r.includes("ii")) img = "d2.png";
+                else img = "d1.png";
+            } else if (r.includes("platinum")) {
+                if (r.includes("iii")) img = "p3.png";
+                else if (r.includes("ii")) img = "p2.png";
+                else img = "p1.png";
+            } else if (r.includes("gold")) {
+                if (r.includes("iii")) img = "g3.png";
+                else if (r.includes("ii")) img = "g2.png";
+                else img = "g1.png";
+            } else if (r.includes("silver")) {
+                if (r.includes("iii")) img = "s3.png";
+                else if (r.includes("ii")) img = "s2.png";
+                else img = "s1.png";
+            } else if (r.includes("bronze")) {
+                if (r.includes("iii")) img = "b3.png";
+                else if (r.includes("ii")) img = "b2.png";
+                else img = "b1.png";
+            }
+
+            return { img: "/img/" + img };
+        }
+
+        async function update() {
+            try {
+                const response = await fetch("/apiranga/" + nick);
+                const data = await response.json();
+                const apiModeName = modeMapping[mode] || modeMapping["2s"];
+                const segment = data.data.segments.find(x => x.metadata.name === apiModeName);
+
+                if (segment) {
+                    const rankName = segment.stats.tier.metadata.name;
+                    const v = getRankData(rankName);
+
+                    document.getElementById('mode-label').innerText = trackerModes[mode] || "?";
+                    document.getElementById('rank').innerText = rankName;
+                    document.getElementById('mmr').innerText = segment.stats.rating.value;
+
+                    const imgEl = document.getElementById('rank-img');
+                    imgEl.src = v.img;
+                    imgEl.style.display = "block";
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function updateSession() {
             try {
                 const progRes = await fetch('/apiprogram/');
                 const progJson = await progRes.json();
                 const programStartTime = new Date(progJson.czas_startu);
 
-                const sessRes = await fetch(`/apisesja/${NICK}`);
+                const sessRes = await fetch(`/apisesja/${encodeURIComponent(nick)}`);
                 const sessJson = await sessRes.json();
+                const currentModeName = modeMapping[mode] || modeMapping["2s"];
 
                 let w = 0, l = 0, delta = 0;
                 let sessionMatches = [];
@@ -140,19 +249,16 @@
                         if (session.matches) {
                             session.matches.forEach(m => {
                                 const matchDate = new Date(m.metadata.dateCollected);
-                                if (m.metadata.playlist === currentModeName && matchDate >= programStartTime) {
-                                    
+                                if (
+                                    m.metadata.isGrouped === false &&
+                                    m.metadata.playlist === currentModeName &&
+                                    matchDate > programStartTime
+                                ) {
                                     sessionMatches.push(m);
-
                                     const matchWins = m.stats.wins ? m.stats.wins.value : 0;
                                     const matchPlayed = m.stats.matchesPlayed ? m.stats.matchesPlayed.value : 1;
-                                    
-                                    let actualWins = matchWins;
-                                    if (matchWins === 0 && m.metadata.result === "victory") actualWins = 1;
-
-                                    w += actualWins;
-                                    l += (matchPlayed - actualWins);
-                                    
+                                    w += matchWins;
+                                    l += (matchPlayed - matchWins);
                                     if (m.stats.rating && m.stats.rating.metadata && m.stats.rating.metadata.ratingDelta) {
                                         delta += m.stats.rating.metadata.ratingDelta;
                                     }
@@ -163,53 +269,50 @@
                 }
 
                 sessionMatches.sort((a, b) => new Date(a.metadata.dateCollected) - new Date(b.metadata.dateCollected));
-
                 let currentStreak = 0;
                 sessionMatches.forEach(m => {
-                    const isWin = (m.stats.wins && m.stats.wins.value > 0) || m.metadata.result === "victory";
+                    const isWin = (m.stats.wins && m.stats.wins.value > 0) || m.metadata.result === 'victory';
                     if (isWin) {
-                        if (currentStreak >= 0) currentStreak++;
-                        else currentStreak = 1;
+                        currentStreak = currentStreak >= 0 ? currentStreak + 1 : 1;
                     } else {
-                        if (currentStreak <= 0) currentStreak--;
-                        else currentStreak = -1;
+                        currentStreak = currentStreak <= 0 ? currentStreak - 1 : -1;
                     }
                 });
 
                 document.getElementById('session-wins').innerText = w;
                 document.getElementById('session-losses').innerText = l;
 
-                const streakEl = document.getElementById('streak-display');
+                const streakEl = document.getElementById('win-streak');
                 if (currentStreak > 0) {
-                    streakEl.innerText = `+${currentStreak} STREAK`;
-                    streakEl.style.color = "#2ecc71";
+                    streakEl.innerText = `+${currentStreak}`;
+                    streakEl.className = 'plus';
                 } else if (currentStreak < 0) {
-                    streakEl.innerText = `${currentStreak} STREAK`;
-                    streakEl.style.color = "#e74c3c";
+                    streakEl.innerText = `${currentStreak}`;
+                    streakEl.className = 'minus';
                 } else {
-                    streakEl.innerText = "0 STREAK";
-                    streakEl.style.color = "#ffd700";
+                    streakEl.innerText = '0';
+                    streakEl.className = 'streak';
                 }
 
                 const deltaEl = document.getElementById('mmr-delta');
                 if (delta > 0) {
                     deltaEl.innerText = `+${delta}`;
-                    deltaEl.className = "delta-value plus";
+                    deltaEl.className = 'value plus';
                 } else if (delta < 0) {
-                    deltaEl.innerText = delta;
-                    deltaEl.className = "delta-value minus";
+                    deltaEl.innerText = `${delta}`;
+                    deltaEl.className = 'value minus';
                 } else {
-                    deltaEl.innerText = "0";
-                    deltaEl.className = "delta-value neutral";
+                    deltaEl.innerText = '0';
+                    deltaEl.className = 'value neutral';
                 }
-
-            } catch (e) {
-                console.error("Błąd:", e);
-            }
+            } catch (e) { console.error('Błąd sesji:', e); }
         }
 
-        setInterval(updateStats, 30000);
-        updateStats();
+        update();
+        updateSession();
+        setInterval(update, 300000);
+        setInterval(updateSession, 180000);
     </script>
 </body>
+
 </html>

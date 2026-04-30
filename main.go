@@ -29,17 +29,14 @@ func proxyTracker(w http.ResponseWriter, apiURL string, nick string) {
 	c := &http.Client{Timeout: 15 * time.Second}
 	req, _ := http.NewRequest("GET", apiURL, nil)
 
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:149.0) Gecko/20100101 Firefox/149.0")
-	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:150.0) Gecko/20100101 Firefox/150.0")
+	req.Header.Set("Accept", "application/json, text/plain, */*")
 	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	req.Header.Set("Sec-Fetch-Storage-Access", "active")
 	req.Header.Set("Sec-GPC", "1")
-	req.Header.Set("Alt-Used", "api.tracker.gg")
-	req.Header.Set("Upgrade-Insecure-Requests", "1")
-	req.Header.Set("Sec-Fetch-Dest", "document")
-	req.Header.Set("Sec-Fetch-Mode", "navigate")
-	req.Header.Set("Sec-Fetch-Site", "none")
-	req.Header.Set("Sec-Fetch-User", "?1")
-	req.Header.Set("Priority", "u=0, i")
+	req.Header.Set("Sec-Fetch-Dest", "empty")
+	req.Header.Set("Sec-Fetch-Mode", "cors")
+	req.Header.Set("Sec-Fetch-Site", "cross-site")
 
 	res, err := c.Do(req)
 	if err != nil {
@@ -70,7 +67,7 @@ func main() {
 	http.HandleFunc("/apiprogram/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Content-Type", "application/json")
-		
+
 		info := map[string]string{
 			"czas_startu": startTime.Format(time.RFC3339),
 		}
