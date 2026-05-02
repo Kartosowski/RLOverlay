@@ -1,14 +1,19 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="UTF-8">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
-        body { 
-            overflow: hidden; 
-            background: transparent !important; 
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            background: transparent !important;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         }
 
         :root {
@@ -18,25 +23,25 @@
             --bg-start: rgba(0, 0, 0, 0.95);
             --bg-end: rgba(0, 0, 0, 0.4);
         }
-        
-        .main { 
-            width: 100vw; 
-            height: 100vh; 
-            display: flex; 
-            align-items: center; 
-            justify-content: flex-start; 
+
+        .main {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
         }
 
         .light {
-            position: relative; 
+            position: relative;
             min-width: 320px;
             width: fit-content;
-            height: 90px; 
-            display: flex; 
-            align-items: center; 
-            padding: 0 70px 0 20px; 
+            height: 90px;
+            display: flex;
+            align-items: center;
+            padding: 0 70px 0 20px;
             gap: 15px;
-            border-left: 4px solid rgba(255,255,255,1);
+            border-left: 4px solid rgba(255, 255, 255, 1);
             border-top-right-radius: 12px;
             border-bottom-right-radius: 12px;
             animation: slideFromLeft 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
@@ -49,51 +54,59 @@
         }
 
         @keyframes slideFromLeft {
-            from { transform: translateX(-100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
+            from {
+                transform: translateX(-100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
         }
 
         .rank-icon {
-            width: 65px; 
+            width: 65px;
             height: 65px;
             object-fit: contain;
-            filter: drop-shadow(0 2px 8px rgba(0,0,0,0.8));
+            filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.8));
             flex-shrink: 0;
         }
 
-        .content { 
-            display: flex; 
-            flex-direction: column; 
+        .content {
+            display: flex;
+            flex-direction: column;
             color: white;
             white-space: nowrap;
         }
 
-        .top-text { 
-            color: rgba(255, 255, 255, 0.5); 
-            font-size: 0.7rem; 
+        .top-text {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.7rem;
             font-weight: 600;
-            letter-spacing: 1px; 
+            letter-spacing: 1px;
             margin-bottom: -1px;
         }
 
-        .rank-text { 
-            font-size: 1.5rem; 
+        .rank-text {
+            font-size: 1.5rem;
             font-weight: 700;
-            line-height: 1.1; 
+            line-height: 1.1;
             margin: 0;
             color: var(--streak-color, #ffffff);
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
         }
 
-        .mmr-container { 
-            font-size: 1.05rem; 
-            font-weight: 600; 
+        .mmr-container {
+            font-size: 1.05rem;
+            font-weight: 600;
             color: rgba(255, 255, 255, 0.9);
             margin-top: 1px;
         }
     </style>
     <style id="custom-css"></style>
 </head>
+
 <body>
     <div class="main">
         <div class="light">
@@ -106,104 +119,143 @@
         </div>
     </div>
 
-<script>
-    const p = window.location.pathname.split('/');
-    const mode = p[2]; 
-    const nick = p[3]; 
-    
-    const trackerModes = {
-        "1s": "Tryb: 1v1",
-        "2s": "Tryb: 2v2",
-        "3s": "Tryb: 3v3"
-    };
+    <script>
+        const p = window.location.pathname.split('/').filter(x => x !== "");
 
-    function getRankData(rankName) {
-        const r = rankName.toLowerCase();
-        let cls = "", img = "unranked.png";
+        let mode = p[1];
+        let nick = p[2];
 
-        if (r.includes("supersonic")) { 
-            cls = "ssl"; img = "ssl.png"; 
-        } else if (r.includes("grand champion")) {
-            cls = "grandchampion";
-            if (r.includes("iii")) img = "gc3.png";
-            else if (r.includes("ii")) img = "gc2.png";
-            else img = "gc1.png";
-        } else if (r.includes("champion")) {
-            cls = "champion";
-            if (r.includes("iii")) img = "c3.png";
-            else if (r.includes("ii")) img = "c2.png";
-            else img = "c1.png";
-        } else if (r.includes("diamond")) {
-            cls = "diamond";
-            if (r.includes("iii")) img = "d3.png";
-            else if (r.includes("ii")) img = "d2.png";
-            else img = "d1.png";
-        } else if (r.includes("platinum")) {
-            cls = "platinum";
-            if (r.includes("iii")) img = "p3.png";
-            else if (r.includes("ii")) img = "p2.png";
-            else img = "p1.png";
-        } else if (r.includes("gold")) {
-            cls = "gold";
-            if (r.includes("iii")) img = "g3.png";
-            else if (r.includes("ii")) img = "g2.png";
-            else img = "g1.png";
-        } else if (r.includes("silver")) {
-            cls = "silver";
-            if (r.includes("iii")) img = "s3.png";
-            else if (r.includes("ii")) img = "s2.png";
-            else img = "s1.png";
-        } else if (r.includes("bronze")) {
-            cls = "bronze";
-            if (r.includes("iii")) img = "b3.png";
-            else if (r.includes("ii")) img = "b2.png";
-            else img = "b1.png";
-        }
+        if (!mode || mode === "ranga") mode = window.CONFIG?.defaultMode || "2s";
+        if (!nick) nick = window.CONFIG?.defaultNick || "me";
 
-        return { cls, img: "/img/" + img };
-    }
+        const trackerModes = {
+            "1s": "Tryb: 1v1",
+            "2s": "Tryb: 2v2",
+            "3s": "Tryb: 3v3",
+            "rumble": "Tryb: Rumble",
+            "hoops": "Tryb: Hoops",
+            "dropshot": "Tryb: Dropshot",
+            "snowday": "Tryb: Snow Day",
+            "tournament": "Tryb: Turnieje"
+        };
 
-    async function update() {
-        if (!nick) {
-            // Fake fallback na potrzeby podglądu w Dashboardzie
-            document.getElementById('mode-label').innerText = "Tryb: 2v2 (Podgląd)";
-            document.getElementById('rank').innerText = "Grand Champion I";
-            document.getElementById('mmr').innerText = "1540";
-            
-            const imgElement = document.getElementById('rank-img');
-            imgElement.src = "/img/gc1.png";
-            imgElement.style.display = "block";
-            return;
-        }
+        function getRankData(rankName) {
+            const r = rankName.toLowerCase();
+            let cls = "", img = "unranked.png";
 
-        try {
-            const response = await fetch("/apiranga/" + nick);
-            const data = await response.json();
-            const apiModeName = mode === "1s" ? "Ranked Duel 1v1" : 
-                               mode === "2s" ? "Ranked Doubles 2v2" : 
-                               "Ranked Standard 3v3";
-            
-            const segment = data.data.segments.find(x => x.metadata.name === apiModeName);
-            
-            if (segment) {
-                const rankName = segment.stats.tier.metadata.name;
-                const v = getRankData(rankName);
-                
-                document.getElementById('mode-label').innerText = trackerModes[mode] || "Tryb: Nieznany";
-                document.getElementById('rank').innerText = rankName;
-                document.getElementById('mmr').innerText = segment.stats.rating.value;
-                
-                const imgElement = document.getElementById('rank-img');
-                imgElement.src = v.img;
-                imgElement.style.display = "block";
+            if (r.includes("supersonic")) {
+                cls = "ssl"; img = "ssl.png";
+            } else if (r.includes("grand champion")) {
+                cls = "grandchampion";
+                if (r.includes("iii")) img = "gc3.png";
+                else if (r.includes("ii")) img = "gc2.png";
+                else img = "gc1.png";
+            } else if (r.includes("champion")) {
+                cls = "champion";
+                if (r.includes("iii")) img = "c3.png";
+                else if (r.includes("ii")) img = "c2.png";
+                else img = "c1.png";
+            } else if (r.includes("diamond")) {
+                cls = "diamond";
+                if (r.includes("iii")) img = "d3.png";
+                else if (r.includes("ii")) img = "d2.png";
+                else img = "d1.png";
+            } else if (r.includes("platinum")) {
+                cls = "platinum";
+                if (r.includes("iii")) img = "p3.png";
+                else if (r.includes("ii")) img = "p2.png";
+                else img = "p1.png";
+            } else if (r.includes("gold")) {
+                cls = "gold";
+                if (r.includes("iii")) img = "g3.png";
+                else if (r.includes("ii")) img = "g2.png";
+                else img = "g1.png";
+            } else if (r.includes("silver")) {
+                cls = "silver";
+                if (r.includes("iii")) img = "s3.png";
+                else if (r.includes("ii")) img = "s2.png";
+                else img = "s1.png";
+            } else if (r.includes("bronze")) {
+                cls = "bronze";
+                if (r.includes("iii")) img = "b3.png";
+                else if (r.includes("ii")) img = "b2.png";
+                else img = "b1.png";
             }
-        } catch (e) {
-            console.error("Błąd aktualizacji:", e);
-        }
-    }
 
-    update();
-    setInterval(update, 300000);
-</script>
+            return { cls, img: "/img/" + img };
+        }
+
+        async function update() {
+            const pCheck = window.location.pathname.split('/').filter(x => x !== "");
+            if (pCheck.length <= 1 && !window.location.search.includes('mode')) {
+                document.getElementById('mode-label').innerText = "Tryb: 2v2 (Podgląd)";
+                document.getElementById('rank').innerText = "Champion II";
+                document.getElementById('mmr').innerText = "1262";
+
+                const imgElement = document.getElementById('rank-img');
+                imgElement.src = "/img/c2.png";
+                imgElement.style.display = "block";
+
+                const container = document.getElementById('container');
+                if (container) container.className = "container champion";
+                return;
+            }
+
+            try {
+                console.log("Nakładka: Pobieranie danych dla trybu:", mode, "nick:", nick);
+                const response = await fetch("/apiranga/" + nick);
+                const data = await response.json();
+
+                if (!data.data || !data.data.segments) {
+                    console.error("Nakładka: Nieprawidłowy format danych z API", data);
+                    return;
+                }
+
+                const apiModeName =
+                    mode === "1s" ? "Ranked Duel 1v1" :
+                        mode === "2s" ? "Ranked Doubles 2v2" :
+                            mode === "3s" ? "Ranked Standard 3v3" :
+                                mode === "rumble" ? "Rumble" :
+                                    mode === "hoops" ? "Hoops" :
+                                        mode === "dropshot" ? "Dropshot" :
+                                            mode === "snowday" ? "Snow Day" :
+                                                mode === "tournament" ? "Tournament" : "Ranked Standard 3v3";
+
+                console.log("Nakładka: Szukam segmentu:", apiModeName);
+                const segment = data.data.segments.find(x => {
+                    return x.metadata && (x.metadata.name === apiModeName || x.type === mode);
+                });
+
+                if (!segment) {
+                    console.warn("Nakładka: Nie znaleziono segmentu dla trybu:", apiModeName, ". Dostępne segmenty:", data.data.segments.map(s => s.metadata?.name || s.type));
+                    return;
+                }
+
+                if (segment) {
+                    const rankName = segment.stats.tier.metadata.name;
+                    const v = getRankData(rankName);
+
+                    console.log("Nakładka: Znaleziono rangę:", rankName, "(Klasa:", v.cls, ")");
+
+                    document.getElementById('mode-label').innerText = trackerModes[mode] || "Tryb: Nieznany";
+                    document.getElementById('rank').innerText = rankName;
+                    document.getElementById('mmr').innerText = segment.stats.rating.value;
+
+                    const imgElement = document.getElementById('rank-img');
+                    imgElement.src = v.img;
+                    imgElement.style.display = "block";
+
+                    const container = document.getElementById('container');
+                    if (container) container.className = "container " + v.cls;
+                }
+            } catch (e) {
+                console.error("Błąd aktualizacji:", e);
+            }
+        }
+
+        update();
+        setInterval(update, 300000);
+    </script>
 </body>
+
 </html>

@@ -187,9 +187,9 @@ const DEFAULTS = {
   sesja_bgOpacity: '90',
   sesja_targetNick: "Kartos'",
   sesja_customCss: '',
-  ranga_theme: 'default',
   ranga_customCss: '',
-  rlPort: '49123'
+  rlPort: '49123',
+  api_provider: 'tracker'
 };
 
 
@@ -207,6 +207,9 @@ function App() {
   const [genNick, setGenNick] = useState('');
   const [copied, setCopied] = useState(false);
   const [copiedSesja, setCopiedSesja] = useState(false);
+  const [epicInfo, setEpicInfo] = useState<{ refreshToken?: string; accountId?: string; displayName?: string }>({});
+  const [epicCode, setEpicCode] = useState('');
+  const [epicStatus, setEpicStatus] = useState<'idle' | 'logging_in' | 'success' | 'error'>('idle');
 
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -227,6 +230,7 @@ function App() {
         if (data.losses !== undefined) setLosses(data.losses);
         if (data.streak !== undefined) setStreak(data.streak);
         if (data.settings) setSettings(prev => ({ ...prev, ...data.settings }));
+        if (data.epic) setEpicInfo(data.epic);
       };
 
       ws.onclose = () => {
@@ -253,9 +257,21 @@ function App() {
       wsRef.current.send(JSON.stringify({ action: 'update_settings', settings: { [key]: value } }));
   };
 
+  const loginEpic = () => {
+    if (!epicCode) return;
+    setEpicStatus('logging_in');
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ action: 'login_epic', code: epicCode }));
+      setEpicCode('');
+      setTimeout(() => setEpicStatus('idle'), 3000);
+    }
+  };
+
   const handleCopy = () => {
     const host = window.location.port === '5173' ? 'localhost:8080' : window.location.host;
-    const url = `http://${host}/ranga/${genMode}/${encodeURIComponent(genNick || 'Nick')}`;
+    const url = settings.api_provider === 'rlapi'
+      ? `http://${host}/ranga/${genMode}`
+      : `http://${host}/ranga/${genMode}/${encodeURIComponent(genNick || 'Nick')}`;
     navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);
@@ -458,20 +474,56 @@ function App() {
                 <div className="space-y-4">
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Nick (Epic Games)</label>
-                    <input type="text" value={genNick} onChange={e => setGenNick(e.target.value)} className="w-full bg-neutral-800 border border-neutral-700 text-neutral-200 px-3 py-2.5 rounded-xl text-sm outline-none focus:border-emerald-500/50 transition-all" placeholder="TwójNick" />
+                    <input
+                      type="text"
+                      value={settings.api_provider === 'rlapi' ? (epicInfo.displayName || 'Twoje Konto') : genNick}
+                      onChange={e => setGenNick(e.target.value)}
+                      disabled={settings.api_provider === 'rlapi'}
+                      className={`w-full bg-neutral-800 border border-neutral-700 text-neutral-200 px-3 py-2.5 rounded-xl text-sm outline-none transition-all ${settings.api_provider === 'rlapi' ? 'opacity-50 cursor-not-allowed' : 'focus:border-emerald-500/50'}`}
+                      placeholder={settings.api_provider === 'rlapi' ? "Automatycznie (Twoje ID)" : "TwójNick"}
+                    />
                   </div>
+
+                  {settings.api_provider === 'rlapi' && (
+                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 flex items-start gap-3">
+                      <AlertTriangle className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-[10px] text-blue-200 leading-tight">
+                          W trybie <strong>RLAPI</strong> statystyki są pobierane bezpośrednio z serwerów Psyonix tylko dla Twojego konta.
+                        </p>
+                        <button
+                          onClick={() => setTab('ustawienia')}
+                          className="text-[9px] text-blue-400 font-bold hover:underline mt-1"
+                        >
+                          Skonfiguruj połączenie w Ustawieniach &rarr;
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Tryb (Playlist)</label>
                     <select value={genMode} onChange={e => setGenMode(e.target.value)} className="w-full bg-neutral-800 border border-neutral-700 text-neutral-200 px-3 py-2.5 rounded-xl text-sm outline-none focus:border-emerald-500/50 transition-all cursor-pointer">
                       <option value="1s">1v1</option>
                       <option value="2s">2v2</option>
                       <option value="3s">3v3</option>
+                      <option value="rumble">Rumble</option>
+                      <option value="hoops">Hoops</option>
+                      <option value="dropshot">Dropshot</option>
+                      <option value="snowday">Snow Day</option>
+                      <option value="tournament">Tournaments</option>
                     </select>
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-2 block">Link dla OBS:</label>
                     <div className="flex bg-neutral-800 border border-neutral-700 rounded-xl overflow-hidden">
-                      <input readOnly value={`http://localhost:8080/ranga/${genMode}/${encodeURIComponent(genNick || 'Nick')}`} className="flex-1 bg-transparent text-emerald-400 font-mono text-xs px-3 py-3 outline-none" />
+                      <input
+                        readOnly
+                        value={settings.api_provider === 'rlapi'
+                          ? `http://${window.location.port === '5173' ? 'localhost:8080' : window.location.host}/ranga/${genMode}`
+                          : `http://${window.location.port === '5173' ? 'localhost:8080' : window.location.host}/ranga/${genMode}/${encodeURIComponent(genNick || 'Nick')}`
+                        }
+                        className="flex-1 bg-transparent text-emerald-400 font-mono text-xs px-3 py-3 outline-none"
+                      />
                       <button
                         onClick={handleCopy}
                         className={`px-4 py-3 text-xs font-bold uppercase transition-all flex items-center gap-1.5 ${copied ? 'bg-emerald-600 text-white' : 'bg-neutral-700 hover:bg-neutral-600 text-neutral-300'}`}
@@ -511,6 +563,90 @@ function App() {
 
           {tab === 'ustawienia' && (
             <div className="space-y-5 flex flex-col h-full">
+
+              <div className="bg-neutral-950 p-5 border border-neutral-800 rounded-2xl">
+                <h3 className="text-[10px] uppercase tracking-widest text-emerald-500 font-bold mb-4 flex items-center gap-2">
+                  Epic Games Integration (rlapi)
+                </h3>
+
+                <div className="flex flex-col gap-1.5 mb-6">
+                  <label className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">
+                    Wybierz źródło danych (API)
+                  </label>
+                  <select
+                    value={settings.api_provider || 'tracker'}
+                    onChange={e => updateSetting('api_provider', e.target.value)}
+                    className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-3 text-sm text-neutral-200 outline-none focus:border-emerald-500/50 transition-colors"
+                  >
+                    <option value="tracker">Tracker.gg (Wymaga tylko nicku)</option>
+                    <option value="rlapi">RLAPI (Direct Connection - Twoje konto)</option>
+                  </select>
+                  <p className="text-[9px] text-neutral-600 italic">
+                    * RLAPI działa tylko dla Twojego własnego konta po zalogowaniu poniżej. Tracker.gg pozwala podejrzeć każdego, ale bywa blokowany.
+                  </p>
+                </div>
+
+                {epicInfo.refreshToken ? (
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center text-emerald-500">
+                        <Check size={20} />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-emerald-500 uppercase tracking-wider">Zalogowano jako</div>
+                        <div className="text-sm font-black text-neutral-200">{epicInfo.displayName || 'Użytkownik Epic'}</div>
+                        <div className="text-[10px] text-neutral-500 font-mono mt-0.5">{epicInfo.accountId}</div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mb-4">
+                    <p className="text-xs text-amber-200 leading-relaxed">
+                      Zaloguj się kontem Epic Games, aby umożliwić śledzenie rangi za pomocą biblioteki <strong>rlapi</strong>.
+                      To rozwiązanie jest stabilniejsze niż tracker.gg.
+                    </p>
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
+                      1. Uzyskaj kod autoryzacji
+                    </label>
+                    <a
+                      href="https://www.epicgames.com/id/api/redirect?clientId=34a02cf8f4414e29b15921876da36f9a&responseType=code"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-center py-2.5 rounded-xl text-xs font-bold transition-all text-neutral-300"
+                    >
+                      Otwórz stronę logowania Epic Games
+                    </a>
+                    <p className="text-[9px] text-neutral-600">Po zalogowaniu skopiuj parametr "authorizationCode" z adresu URL.</p>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
+                      2. Wklej kod tutaj
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={epicCode}
+                        onChange={e => setEpicCode(e.target.value)}
+                        className="flex-1 bg-neutral-800 border border-neutral-700 text-neutral-200 px-3 py-2.5 rounded-xl text-xs outline-none focus:border-emerald-500/50 transition-all font-mono"
+                        placeholder="np. 8f7392f0f4e9..."
+                      />
+                      <button
+                        onClick={loginEpic}
+                        disabled={!epicCode || epicStatus === 'logging_in'}
+                        className="px-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:hover:bg-emerald-600 rounded-xl text-xs font-bold uppercase transition-all text-white shadow-lg"
+                      >
+                        {epicStatus === 'logging_in' ? '...' : 'Połącz'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               <div className="bg-neutral-950 p-5 border border-neutral-800 rounded-2xl">
                 <h3 className="text-[10px] uppercase tracking-widest text-emerald-500 font-bold mb-4">Ustawienia Systemowe</h3>

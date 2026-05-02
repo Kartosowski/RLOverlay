@@ -7,11 +7,13 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
+	"context"
+
+	"github.com/dank/rlapi"
 	"github.com/fatih/color"
 	"github.com/gorilla/websocket"
 )
@@ -25,6 +27,11 @@ var startTime time.Time
 type Config struct {
 	Port     string            `json:"port"`
 	Settings map[string]string `json:"settings"`
+	Epic     struct {
+		RefreshToken string `json:"refreshToken"`
+		AccountID    string `json:"accountId"`
+		DisplayName  string `json:"displayName"`
+	} `json:"epic"`
 }
 
 type SessionState struct {
@@ -41,6 +48,8 @@ var (
 	clients     = make(map[*websocket.Conn]bool)
 	dashClients = make(map[*websocket.Conn]bool)
 	rlConnected bool
+	rlapiClient *rlapi.PsyNetRPC
+	rlapiMu     sync.Mutex
 )
 
 func loadState() {
@@ -55,11 +64,29 @@ func loadState() {
 
 func loadConfig() {
 	b, err := os.ReadFile("config.json")
-	if err == nil {
-		json.Unmarshal(b, &config)
+
+	if err != nil {
+		fmt.Println("[Config] Nie znaleziono config.json. Utworzono plik.")
+		config.Port = "8080"
+		config.Settings = map[string]string{
+			"sesja_winColor":    "#00ff88",
+			"sesja_lossColor":   "#ff3366",
+			"sesja_streakColor": "#ffffff",
+			"sesja_bgColor":     "#141414",
+			"sesja_bgOpacity":   "90",
+			"sesja_targetNick":  "Kartos'",
+			"rlPort":            "49123",
+		}
+		saveConfig()
+		return
 	}
+
+	json.Unmarshal(b, &config)
+
+	needsSave := false
 	if config.Port == "" {
 		config.Port = "8080"
+		needsSave = true
 	}
 	if config.Settings == nil {
 		config.Settings = map[string]string{
@@ -71,6 +98,11 @@ func loadConfig() {
 			"sesja_targetNick":  "Kartos'",
 			"rlPort":            "49123",
 		}
+		needsSave = true
+	}
+
+	if needsSave {
+		saveConfig()
 	}
 }
 
@@ -96,6 +128,7 @@ func broadcastState() {
 		"streak":      state.Streak,
 		"settings":    config.Settings,
 		"rlConnected": rlConnected,
+		"epic":        config.Epic,
 	}
 	stateMutex.Unlock()
 
@@ -186,6 +219,51 @@ func processGameData(dataStr string) {
 			stateMutex.Unlock()
 		}
 	}
+}
+
+func getRLAPIClient() (*rlapi.PsyNetRPC, error) {
+	rlapiMu.Lock()
+	defer rlapiMu.Unlock()
+
+	if rlapiClient != nil {
+		return rlapiClient, nil
+	}
+
+	if config.Epic.RefreshToken == "" {
+		return nil, fmt.Errorf("brak refresh tokenu Epic Games")
+	}
+
+	egs := rlapi.NewEGS()
+	auth, err := egs.AuthenticateWithRefreshToken(config.Epic.RefreshToken)
+	if err != nil {
+		return nil, fmt.Errorf("błąd auth EGS: %v", err)
+	}
+
+	if auth.RefreshToken != config.Epic.RefreshToken {
+		config.Epic.RefreshToken = auth.RefreshToken
+		config.Epic.AccountID = auth.AccountID
+		config.Epic.DisplayName = auth.DisplayName
+		go saveConfig()
+	}
+
+	code, err := egs.GetExchangeCode(auth.AccessToken)
+	if err != nil {
+		return nil, fmt.Errorf("błąd exchange code: %v", err)
+	}
+
+	authToken, err := egs.ExchangeEOSToken(code)
+	if err != nil {
+		return nil, fmt.Errorf("błąd EOS token: %v", err)
+	}
+
+	psyNet := rlapi.NewPsyNet()
+	rpc, err := psyNet.AuthPlayer(authToken.AccessToken, authToken.AccountID, auth.DisplayName)
+	if err != nil {
+		return nil, fmt.Errorf("błąd PsyNet auth: %v", err)
+	}
+
+	rlapiClient = rpc
+	return rlapiClient, nil
 }
 
 func startRLTCPClient() {
@@ -291,8 +369,126 @@ func main() {
 		if nick == "" {
 			return
 		}
-		apiURL := "https://api.tracker.gg/api/v2/rocket-league/standard/profile/epic/" + nick
-		proxyTracker(w, apiURL, nick)
+
+		stateMutex.Lock()
+		provider := config.Settings["api_provider"]
+		stateMutex.Unlock()
+
+		if provider == "tracker" || provider == "" {
+			client := &http.Client{Timeout: 10 * time.Second}
+			apiURL := "https://api.tracker.gg/api/v2/rocket-league/standard/profile/epic/" + nick
+			req, _ := http.NewRequest("GET", apiURL, nil)
+			req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+
+			resp, err := client.Do(req)
+			if err != nil {
+				http.Error(w, "Tracker.gg error", http.StatusInternalServerError)
+				return
+			}
+			defer resp.Body.Close()
+
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Content-Type", "application/json")
+			io.Copy(w, resp.Body)
+			return
+		}
+
+		rpc, err := getRLAPIClient()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+
+		ctx := context.Background()
+
+		targetID := nick
+		stateMutex.Lock()
+		isMe := strings.EqualFold(nick, "me") || strings.EqualFold(nick, "Twoje Konto") || (config.Epic.DisplayName != "" && strings.EqualFold(nick, config.Epic.DisplayName))
+		if isMe && config.Epic.AccountID != "" {
+			targetID = config.Epic.AccountID
+		}
+		stateMutex.Unlock()
+
+		playerID := rlapi.NewPlayerID(rlapi.PlatformEpic, targetID)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		skill, err := rpc.GetPlayerSkill(ctx, playerID)
+		if err != nil {
+			fmt.Printf("RLAPI Error (GetPlayerSkill): %v\n", err)
+			http.Error(w, "Błąd pobierania rangi", http.StatusInternalServerError)
+			return
+		}
+
+		output := map[string]interface{}{
+			"platformInfo": map[string]string{"platformUserHandle": nick},
+			"segments": []interface{}{
+				map[string]interface{}{
+					"type":     "overview",
+					"metadata": map[string]interface{}{},
+					"stats": map[string]interface{}{
+						"rewardLevel": map[string]interface{}{"metadata": map[string]string{"rankName": "Bronze"}},
+					},
+				},
+			},
+		}
+
+		playlists := map[int]string{
+			10: "Ranked Duel 1v1",
+			11: "Ranked Doubles 2v2",
+			13: "Ranked Standard 3v3",
+			27: "Hoops",
+			28: "Rumble",
+			29: "Dropshot",
+			30: "Snow Day",
+			34: "Tournament",
+		}
+
+		rankNames := []string{
+			"Unranked",
+			"Bronze I", "Bronze II", "Bronze III",
+			"Silver I", "Silver II", "Silver III",
+			"Gold I", "Gold II", "Gold III",
+			"Platinum I", "Platinum II", "Platinum III",
+			"Diamond I", "Diamond II", "Diamond III",
+			"Champion I", "Champion II", "Champion III",
+			"Grand Champion I", "Grand Champion II", "Grand Champion III",
+			"Supersonic Legend",
+		}
+
+		for _, s := range skill.Skills {
+			name, ok := playlists[s.Playlist]
+			if !ok {
+				continue
+			}
+
+			rankName := "Unknown"
+			if s.Tier >= 0 && s.Tier < len(rankNames) {
+				rankName = rankNames[s.Tier]
+			}
+
+			segment := map[string]interface{}{
+				"type":     "playlist",
+				"metadata": map[string]string{"name": name},
+				"stats": map[string]interface{}{
+					"rating": map[string]interface{}{"value": int(s.MMR*20 + 100)},
+					"tier": map[string]interface{}{
+						"metadata": map[string]interface{}{
+							"name":    rankName,
+							"iconUrl": fmt.Sprintf("/img/ranks/%d.png", s.Tier),
+						},
+					},
+					"division": map[string]interface{}{
+						"metadata": map[string]interface{}{"name": fmt.Sprintf("Division %d", s.Division+1)},
+					},
+				},
+			}
+			output["segments"] = append(output["segments"].([]interface{}), segment)
+		}
+
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{"data": output})
 	})
 
 	http.HandleFunc("/apisesja/", func(w http.ResponseWriter, r *http.Request) {
@@ -300,28 +496,37 @@ func main() {
 		if nick == "" {
 			return
 		}
-		apiURL := "https://api.tracker.gg/api/v2/rocket-league/standard/profile/epic/" + nick + "/sessions/"
-		proxyTracker(w, apiURL, nick)
+
+		rpc, err := getRLAPIClient()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		history, err := rpc.GetMatchHistory(ctx)
+		if err != nil {
+			fmt.Printf("RLAPI Error (GetMatchHistory): %v\n", err)
+			http.Error(w, "Błąd pobierania historii", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(history)
 	})
 
 	http.HandleFunc("/ranga/", func(w http.ResponseWriter, r *http.Request) {
 		stateMutex.Lock()
-		theme := config.Settings["ranga_theme"]
 		rangaCss := config.Settings["ranga_customCss"]
 		stateMutex.Unlock()
 
-		if theme == "" {
-			theme = "default"
-		}
-
-		filePath := "src/ranga.html"
-		if theme != "default" {
-			filePath = filepath.Join("custom_overlay", "ranga", theme, "ranga.html")
-		}
-
-		b, err := os.ReadFile(filePath)
+		b, err := os.ReadFile("src/ranga.html")
 		if err != nil {
-			b, _ = os.ReadFile("src/ranga.html")
+			http.Error(w, "Nie znaleziono src/ranga.html", http.StatusNotFound)
+			return
 		}
 
 		html := string(b)
@@ -367,22 +572,15 @@ func main() {
 		w.Write(b)
 	})
 
-	http.HandleFunc("/api/themes", func(w http.ResponseWriter, r *http.Request) {
-		themes := []string{"default"}
-		dirs, err := os.ReadDir(filepath.Join("custom_overlay", "ranga"))
-		if err == nil {
-			for _, d := range dirs {
-				if d.IsDir() {
-					themes = append(themes, d.Name())
-				}
-			}
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(themes)
-	})
-
 	dashboardFS := http.FileServer(http.Dir("src/dashboard"))
 	http.Handle("/dashboard/", http.StripPrefix("/dashboard/", dashboardFS))
+
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			http.Redirect(w, r, "/dashboard/", http.StatusFound)
+			return
+		}
+	})
 
 	http.HandleFunc("/ws/sesja", func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -399,6 +597,7 @@ func main() {
 			"streak":      state.Streak,
 			"settings":    config.Settings,
 			"rlConnected": rlConnected,
+			"epic":        config.Epic,
 		}
 		conn.WriteJSON(msg)
 		stateMutex.Unlock()
@@ -429,6 +628,7 @@ func main() {
 			"streak":      state.Streak,
 			"settings":    config.Settings,
 			"rlConnected": rlConnected,
+			"epic":        config.Epic,
 		}
 		conn.WriteJSON(msg)
 		stateMutex.Unlock()
@@ -484,6 +684,20 @@ func main() {
 							}
 						}
 						go saveConfig()
+					}
+				case "login_epic":
+					if code, ok := action["code"].(string); ok {
+						egs := rlapi.NewEGS()
+						auth, err := egs.AuthenticateWithCode(code)
+						if err == nil {
+							config.Epic.RefreshToken = auth.RefreshToken
+							config.Epic.AccountID = auth.AccountID
+							config.Epic.DisplayName = auth.DisplayName
+							rlapiMu.Lock()
+							rlapiClient = nil
+							rlapiMu.Unlock()
+							go saveConfig()
+						}
 					}
 				}
 				stateMutex.Unlock()
