@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	figure "github.com/common-nighthawk/go-figure"
 	"github.com/fatih/color"
 	"github.com/gorilla/websocket"
 )
@@ -267,9 +266,18 @@ func main() {
 
 	go startRLTCPClient()
 
-	v := color.New(color.FgHiMagenta, color.Bold)
-	wColor := color.New(color.FgWhite, color.Bold)
-	v.Println(figure.NewFigure("Kartos Rank", "slant", true).String())
+	cyan := color.New(color.FgCyan)
+	white := color.New(color.FgWhite)
+	whiteBold := color.New(color.FgWhite, color.Bold)
+
+	whiteBold.Println("RL Overlay")
+	white.Println("Wykonawca: Kartos")
+	white.Printf("Aplikacja dziala na porcie: %s\n", config.Port)
+	white.Print("Dashboard: ")
+	cyan.Printf("http://localhost:%s/dashboard/\n", config.Port)
+	white.Print("GitHub:    ")
+	cyan.Println("https://github.com/Kartosowski/RLOverlay")
+	fmt.Println()
 
 	http.HandleFunc("/apiprogram/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -499,6 +507,5 @@ func main() {
 		w.Write(b)
 	})
 
-	wColor.Printf("✅ Serwer działa na porcie %s\n", config.Port)
 	http.ListenAndServe(":"+config.Port, nil)
 }
