@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@700;900&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body { 
+            overflow: hidden; 
+            background: transparent !important; 
+            font-family: 'Inter', sans-serif; 
+            color: white;
+            text-transform: uppercase;
+        }
+        
+        .main { 
+            width: 100vw; 
+            height: 100vh; 
+            display: flex; 
+            align-items: center; 
+            justify-content: flex-end; /* Wyrównanie do prawej */
+        }
+
+        .container {
+            display: flex; 
+            align-items: center; 
+            background: rgba(0, 0, 0, 0.6); 
+            gap: 20px;
+            padding: 15px 25px;
+            text-align: right;
+            animation: slideIn 0.4s ease-out forwards;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .content { 
+            display: flex; 
+            flex-direction: column; 
+        }
+
+        .mode-text { 
+            color: rgba(255, 255, 255, 0.6); 
+            font-size: 0.9rem; 
+            font-weight: 700;
+        }
+
+        .rank-text { 
+            font-size: 2rem; 
+            font-weight: 900;
+            line-height: 1;
+            margin: 2px 0;
+        }
+
+        .mmr-container { 
+            font-size: 1.3rem; 
+            font-weight: 700; 
+        }
+
+        .rank-icon {
+            width: 70px; 
+            height: 70px;
+            object-fit: contain;
+            order: 2; /* Ikona po prawej stronie tekstu */
+        }
+    </style>
+</head>
+<body>
+    <div class="main">
+        <div class="container">
+            <img id="rank-img" src="" class="rank-icon" style="display: none;">
+            <div class="content">
+                <div id="mode-label" class="mode-text">-</div>
+                <div id="rank" class="rank-text">Loading...</div>
+                <div id="mmr-box" class="mmr-container">MMR: <span id="mmr">-</span></div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const p = window.location.pathname.split('/');
+    const mode = p[2]; 
+    const nick = p[3]; 
+    
+    const trackerModes = {
+        "1s": "1v1",
+        "2s": "2v2",
+        "3s": "3v3"
+    };
+
+    function getRankData(rankName) {
+        const r = rankName.toLowerCase();
+        let cls = "", img = "unranked.png";
+
+        if (r.includes("supersonic")) { cls = "ssl"; img = "ssl.png"; }
+        else if (r.includes("grand champion")) {
+            if (r.includes("iii")) img = "gc3.png";
+            else if (r.includes("ii")) img = "gc2.png";
+            else img = "gc1.png";
+        } else if (r.includes("champion")) {
+            if (r.includes("iii")) img = "c3.png";
+            else if (r.includes("ii")) img = "c2.png";
+            else img = "c1.png";
+        } else if (r.includes("diamond")) {
+            if (r.includes("iii")) img = "d3.png";
+            else if (r.includes("ii")) img = "d2.png";
+            else img = "d1.png";
+        } else if (r.includes("platinum")) {
+            if (r.includes("iii")) img = "p3.png";
+            else if (r.includes("ii")) img = "p2.png";
+            else img = "p1.png";
+        } else if (r.includes("gold")) {
+            if (r.includes("iii")) img = "g3.png";
+            else if (r.includes("ii")) img = "g2.png";
+            else img = "g1.png";
+        } else if (r.includes("silver")) {
+            if (r.includes("iii")) img = "s3.png";
+            else if (r.includes("ii")) img = "s2.png";
+            else img = "s1.png";
+        } else if (r.includes("bronze")) {
+            if (r.includes("iii")) img = "b3.png";
+            else if (r.includes("ii")) img = "b2.png";
+            else img = "b1.png";
+        }
+
+        return { img: "/img/" + img };
+    }
+
+    async function update() {
+        try {
+            const response = await fetch("/apiranga/" + nick);
+            const data = await response.json();
+            const apiModeName = mode === "1s" ? "Ranked Duel 1v1" : 
+                               mode === "2s" ? "Ranked Doubles 2v2" : 
+                               "Ranked Standard 3v3";
+            
+            const segment = data.data.segments.find(x => x.metadata.name === apiModeName);
+            
+            if (segment) {
+                const rankName = segment.stats.tier.metadata.name;
+                const v = getRankData(rankName);
+                
+                document.getElementById('mode-label').innerText = trackerModes[mode] || "UNKNOWN";
+                document.getElementById('rank').innerText = rankName;
+                document.getElementById('mmr').innerText = segment.stats.rating.value;
+                
+                const imgElement = document.getElementById('rank-img');
+                imgElement.src = v.img;
+                imgElement.style.display = "block";
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    update();
+    setInterval(update, 300000);
+</script>
+</body>
+</html>

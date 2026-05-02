@@ -1,0 +1,12 @@
+# Dependencies
+node_modules/
+dashboard/node_modules/
+dashboard/dist/
+
+# Local data/config
+config.json
+sesja.json
+
+# Binaries
+*.exe
+rloverlay
